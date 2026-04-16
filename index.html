@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mission: Dual Detection</title>
+    <style>
+        :root {
+            --pastel-pink: #ffd1dc;
+            --pastel-purple: #e0bbe4;
+            --pastel-green: #b2f2bb; /* Mission Accomplished */
+            --pastel-red: #ffb3ba;   /* Wrong Answer / Mission Failed */
+            --pastel-blue: #a2d2ff;  /* Button Selection */
+            --text-dark: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body, html {
+            height: 100%;
+            overflow: hidden;
+            background-color: #2c2c2c;
+        }
+
+        #game-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .player-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            transition: background-color 0.2s ease;
+            text-align: center;
+        }
+
+        #p1-side { background-color: var(--pastel-pink); border-right: 3px solid #444; }
+        #p2-side { background-color: var(--pastel-purple); }
+
+        /* Color States */
+        .wrong-flash { background-color: var(--pastel-red) !important; }
+        .finished-success { background-color: var(--pastel-green) !important; }
+        .finished-fail { background-color: var(--pastel-red) !important; }
+
+        .header { margin-bottom: 25px; }
+        .agency-name { font-size: 2.2rem; font-weight: 800; color: var(--text-dark); text-transform: uppercase; }
+        .score-board { font-size: 1.4rem; font-weight: bold; color: #555; }
+
+        .question-text {
+            font-size: 1.6rem;
+            min-height: 140px;
+            margin-bottom: 30px;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            color: var(--text-dark);
+            width: 100%;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        button {
+            padding: 18px 10px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 15px;
+            background: white;
+            color: var(--text-dark);
+            box-shadow: 0 4px 0 rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        button.selected {
+            background-color: var(--pastel-blue) !important;
+        }
+
+        .end-message {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--text-dark);
+            line-height: 1.2;
+        }
+
+        .final-score {
+            font-size: 2rem;
+            margin-top: 20px;
+            color: #444;
+        }
+
+        /* Responsive scaling */
+        @media (max-width: 900px) {
+            .question-text { font-size: 1.2rem; min-height: 100px; }
+            .agency-name { font-size: 1.5rem; }
+            .end-message { font-size: 2.2rem; }
+            button { font-size: 1rem; padding: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="p1-side" class="player-side">
+        <div class="header">
+            <div class="agency-name">Agency 1</div>
+            <div class="score-board">Score: <span id="p1-score">0</span> / 10</div>
+        </div>
+        <div id="p1-content" style="width:100%">
+            <div class="question-text" id="p1-q">Loading Mission...</div>
+            <div class="options-grid" id="p1-btns"></div>
+        </div>
+    </div>
+
+    <div id="p2-side" class="player-side">
+        <div class="header">
+            <div class="agency-name">Agency 2</div>
+            <div class="score-board">Score: <span id="p2-score">0</span> / 10</div>
+        </div>
+        <div id="p2-content" style="width:100%">
+            <div class="question-text" id="p2-q">Loading Mission...</div>
+            <div class="options-grid" id="p2-btns"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const questionsBank = [
+        { q: "Which type of art uses electronic and mechanical devices instead of traditional hand techniques to create images and effects?", a: "Digital Art" },
+        { q: "Which art form allows anyone to create technology-based artworks using devices like laptops, tablets, and smartphones?", a: "Digital Art" },
+        { q: "Which type of art transforms a mobile phone into a creative platform for multimedia projects?", a: "Mobile Phone Art" },
+        { q: "Which art form combines images, text, sound, effects, and simple animations using a smartphone?", a: "Mobile Phone Art" },
+        { q: "Which type of art involves creating original visuals from scratch using programs like Adobe Illustrator and CorelDRAW?", a: "Computer-generated Art" },
+        { q: "Which art form focuses on illustration and image manipulation through specialized software?", a: "Computer-generated Art" },
+        { q: "Which type of art captures images using cameras or devices with built-in cameras like smartphones and tablets?", a: "Digital Photography" },
+        { q: "Which art form includes the use of point-and-shoot and DSLR cameras for taking pictures?", a: "Digital Photography" },
+        { q: "Which type of art combines traditional painting mediums like oil or watercolor with modern digital tools?", a: "Digital Painting" },
+        { q: "Which art form allows artists to create, edit, and share their paintings digitally while still using surfaces like canvas or paper?", a: "Digital Painting" }
+    ];
+
+    const possibleAnswers = ["Digital Art", "Mobile Phone Art", "Computer-generated Art", "Digital Photography", "Digital Painting"];
+
+    class AgencyGame {
+        constructor(sideId, scoreId, questionId, btnContainerId, contentId) {
+            this.side = document.getElementById(sideId);
+            this.scoreEl = document.getElementById(scoreId);
+            this.questionEl = document.getElementById(questionId);
+            this.btnContainer = document.getElementById(btnContainerId);
+            this.contentArea = document.getElementById(contentId);
+            
+            this.score = 0;
+            this.currentIdx = 0;
+            this.hasWrongAnswer = false;
+            this.myQuestions = this.shuffle([...questionsBank]);
+            
+            this.render();
+        }
+
+        shuffle(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        render() {
+            if (this.currentIdx >= 10) {
+                this.showFinish();
+                return;
+            }
+
+            const currentQ = this.myQuestions[this.currentIdx];
+            this.questionEl.innerText = currentQ.q;
+            this.btnContainer.innerHTML = '';
+
+            // Shuffle the 5 buttons
+            const shuffledButtons = this.shuffle([...possibleAnswers]);
+            
+            shuffledButtons.forEach(choice => {
+                const btn = document.createElement('button');
+                btn.innerText = choice;
+                btn.onclick = (e) => this.handleAnswer(choice, currentQ.a, e.target);
+                this.btnContainer.appendChild(btn);
+            });
+        }
+
+        handleAnswer(selected, correct, btnElement) {
+            // Disable all buttons for this side temporarily
+            const allBtns = this.btnContainer.querySelectorAll('button');
+            allBtns.forEach(b => b.style.pointerEvents = 'none');
+
+            // Light up selection
+            btnElement.classList.add('selected');
+
+            setTimeout(() => {
+                if (selected === correct) {
+                    this.score++;
+                    this.scoreEl.innerText = this.score;
+                    this.proceed();
+                } else {
+                    this.hasWrongAnswer = true;
+                    this.side.classList.add('wrong-flash');
+                    setTimeout(() => {
+                        this.side.classList.remove('wrong-flash');
+                        this.proceed();
+                    }, 400);
+                }
+            }, 300);
+        }
+
+        proceed() {
+            this.currentIdx++;
+            this.render();
+        }
+
+        showFinish() {
+            const success = !this.hasWrongAnswer && this.score === 10;
+            
+            if (success) {
+                this.side.classList.add('finished-success');
+                this.contentArea.innerHTML = `
+                    <div class="end-message">Mission Accomplished!</div>
+                    <div class="final-score">Final Score: ${this.score}</div>
+                `;
+            } else {
+                this.side.classList.add('finished-fail');
+                this.contentArea.innerHTML = `
+                    <div class="end-message">Mission Failed!</div>
+                    <div class="final-score">Final Score: ${this.score}</div>
+                `;
+            }
+        }
+    }
+
+    // Initialize both Agency sides
+    const player1 = new AgencyGame('p1-side', 'p1-score', 'p1-q', 'p1-btns', 'p1-content');
+    const player2 = new AgencyGame('p2-side', 'p2-score', 'p2-q', 'p2-btns', 'p2-content');
+</script>
+
+</body>
+</html>
